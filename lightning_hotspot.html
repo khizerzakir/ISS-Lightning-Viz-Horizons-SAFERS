@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Lightning Data Visualization</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
+    <script src="https://cdn.maptiler.com/maplibre-gl-js/v2.2.0-pre.2/maplibre-gl.js"></script>
+    <script src="https://unpkg.com/pmtiles@2.7.2/dist/index.js"></script>
+    <script src="salzburg.pmtiles"></script>
+    <script src="./PMtile Output/lightning.pmtiles"></script>
+    <script src="./PMtile Output/lightning_data.geojson"></script>
+    <script src="building_salzburg.geojson"></script>
+    <script src="PMtile Output/lightning_data.geojson"></script>
+    <script src="style.json"></script>
+    <link href="https://cdn.maptiler.com/maplibre-gl-js/v2.2.0-pre.2/maplibre-gl.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/nouislider@16.1.0/distribute/nouislider.css" rel="stylesheet" />
+    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@16.1.0/distribute/nouislider.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/nouislider@16.1.0/distribute/nouislider.css" rel="stylesheet" />
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background-color: rgba(128, 128, 128, 0.8);
+            /* Dark grey background */
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 20px;
+            font-weight: bold;
+            z-index: 1;
+            /* Ensure it's on top of other elements */
+        }
+
+        #map-title {
+            position: absolute;
+            background-color: #f80404;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        #legend {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(128, 128, 128, 0.8);
+            /* Grey background */
+            padding: 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            color: white;
+            z-index: 1;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 3px;
+        }
+
+        #layerToggle {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+        }
+
+        .layerToggle-label {
+            position: absolute;
+            top: 80px;
+            left: 30px;
+        }
+
+        #layerToggle1 {
+            position: absolute;
+            top: 100px;
+            left: 10px;
+        }
+
+        .layerToggle-label1 {
+            position: absolute;
+            top: 100px;
+            left: 30px;
+        }
+
+        #layerToggle2 {
+            position: absolute;
+            top: 120px;
+            left: 10px;
+        }
+
+        .layerToggle-label2 {
+            position: absolute;
+            top: 120px;
+            left: 30px;
+        }
+
+        #layerToggle3 {
+            position: absolute;
+            top: 140px;
+            left: 10px;
+        }
+
+        .layerToggle-label3 {
+            position: absolute;
+            top: 160px;
+            left: 30px;
+        }
+
+        #slider {
+            position: absolute;
+            top: 180px;
+            left: 10px;
+            right: 1300px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="top-bar">Lightning Intensity and Potential Forest Fires</div>
+
+    <div id="map"></div>
+    <!-- <div id="map-title">Lightning Data Visualization</div> -->
+    <div>
+        <input type="checkbox" id="layerToggle" checked>
+        <label for="layerToggle" class="layerToggle-label">Lightning Data</label>
+    </div>
+    <div>
+        <input type="checkbox" id="layerToggle1" checked>
+        <label for="layerToggle1" class="layerToggle-label1">Land Use</label>
+    </div>
+    <div>
+        <input type="checkbox" id="layerToggle2" unchecked>
+        <label for="layerToggle2" class="layerToggle-label2">Forest Cover</label>
+    </div>
+    <div>
+        <label for="layerToggle3" class="layerToggle-label3">Time Series Lightning</label>
+    </div>
+
+    <div id="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: rgb(178,24,43);"></div>
+            <span>High Lightning Intensity</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: rgb(253,219,199);"></div>
+            <span>Moderate Lightning Intensity</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: rgb(103,169,207);"></div>
+            <span>Low Lightning Intensity</span>
+        </div>
+    </div>
+
+    <div>
+        <label id="month"></label>
+        <input id="slider" type="range" min="0" max="11" step="1" value="0" />
+    </div>
+    <script>
+
+        // Initialize Maplibre Base Map
+        const key = 'ENGxwc93eUk1G1MBKnFt';
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: `https://api.maptiler.com/maps/streets-v2/style.json?key=ENGxwc93eUk1G1MBKnFt`,
+            center: [13.072267694928943, 47.7793511062471],
+            zoom: 4,
+            hash: true
+        });
+
+        // Initialize PMtiles Protocol
+        let protocol = new pmtiles.Protocol();
+        maplibregl.addProtocol("pmtiles", protocol.tile);
+
+        // Visualizing PMtile Layers 
+        map.on('load', function () {
+            map.loadImage('https://cdn2.iconfinder.com/data/icons/weather-1153/512/Weather_15.png', function (error, image) {
+                if (error) throw error;
+                map.addImage('Airport_icon', image);
+
+
+                // // Landuse
+                // map.addSource('raster-source', {
+                //     type: 'raster',
+                //     tiles: ['https://api.maptiler.com/tiles/landcover/{z}/{x}/{y}.pbf?key=ENGxwc93eUk1G1MBKnFt'],
+                // });
+
+                // map.addLayer({
+                //     id: 'raster-layer',
+                //     type: 'raster',
+                //     source: 'raster-source',
+                //     'source-layer': 'landcover',
+                //     paint: {
+                //         'fill-color': [
+                //             'match',
+                //             ['get', 'class'],  // Replace 'class' with the actual property name in the data
+                //             'forest', '#228B22', // Forest areas colored green
+                //             'water', '#4682B4', // Water bodies colored blue
+                //             'urban', '#A9A9A9', // Urban areas colored gray
+                //             '#CCCCCC' // Default color for other areas
+                //         ],
+                //         'fill-opacity': 0.6
+                //     } // Specify the layer name in the PMTile file
+
+                // });
+                  // Forest Layer
+                    map.addSource('raster-source-forest', {
+                        type: 'raster',
+                        tiles: ['https://api.maptiler.com/tiles/eee1468b-4e83-46af-a9cd-32dcdde1a12f/{z}/{x}/{y}.png?key=ENGxwc93eUk1G1MBKnFt'],
+                      
+                    });
+
+                    map.addLayer({
+                        id: 'raster-layer-forest',
+                        type: 'raster',
+                        source: 'raster-source-forest',
+                        'source-layer': 'forest_clip_europe',
+                        layout: {
+                            visibility: 'none'
+                        }, // Specify the layer name in the PMTile file
+
+                   });
+                   
+                //   // CapeValue Layer
+                //     map.addSource('capevalue', {
+                //         type: 'raster',
+                //         tiles: ['https://api.maptiler.com/tiles/bfad0e7a-7842-4d7c-822b-57259a53ce8d/{z}/{x}/{y}.png?key=ENGxwc93eUk1G1MBKnFt'],
+                       
+                //     });
+
+                // map.addLayer({
+                //     id: 'point1',
+                //     type: 'raster',
+                //     source: 'capevalue',
+                //     'source-layer': 'capevalue_europe ', // Specify the layer name in the PMTile file
+                  
+                // });
+
+                //Lightning Layer
+                map.addSource('lightning', {
+                    // type: 'vector',
+                    // url: 'pmtiles://http://127.0.0.1:9000/new/lightning.pmtiles',           //Specify PMtile Hosting Link
+                    'type': 'geojson',
+                    'data': 'ISSlis_cape.geojson'
+
+                });
+
+                map.addLayer({
+                    id: 'lightning',
+                    type: 'heatmap',
+                    source: 'lightning', // reference the data source
+                    //'source-layer': 'ISSlislatest',
+                    // 'layout': {'icon-image': 'Airport_icon',
+                    //             'icon-size': 0.09},
+                    'maxzoom': 9,
+                    'paint': {
+                        // Increase the heatmap weight based on frequency and property magnitude
+                        'heatmap-weight': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'time'],
+                            0,
+                            0,
+                            6,
+                            1
+                        ],
+                        // Increase the heatmap color weight weight by zoom level
+                        // heatmap-intensity is a multiplier on top of heatmap-weight
+                        'heatmap-intensity': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            0,
+                            1,
+                            9,
+                            3
+                        ],
+                        // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
+                        // Begin color ramp at 0-stop with a 0-transparancy color
+                        // to create a blur-like effect.
+                        'heatmap-color': [
+                            'interpolate',
+                            ['linear'],
+                            ['heatmap-density'],
+                            0,
+                            'rgba(33,102,172,0)',
+                            0.2,
+                            'rgb(103,169,207)',
+                            0.4,
+                            'rgb(209,229,240)',
+                            0.6,
+                            'rgb(253,219,199)',
+                            0.8,
+                            'rgb(239,138,98)',
+                            1,
+                            'rgb(178,24,43)'
+                        ],
+                        // Adjust the heatmap radius by zoom level
+                        'heatmap-radius': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            0,
+                            2,
+                            9,
+                            20
+                        ],
+                        // Transition from heatmap to circle layer by zoom level
+                        'heatmap-opacity': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            7,
+                            1,
+                            9,
+                            0
+                        ]
+                    }
+
+                });
+
+                map.addLayer(
+                    {
+                        'id': 'lightning-point',
+                        'type': 'circle',
+                        'source': 'lightning',
+                        'minzoom': 7,
+                        'paint': {
+                            // Size circle radius  and zoom level
+                            'circle-radius': [
+                                'interpolate',
+                                ['linear'],
+                                ['zoom'],
+                                7,
+                                ['interpolate', ['linear'], ['get', 'mag'], 1, 1, 6, 4],
+                                16,
+                                ['interpolate', ['linear'], ['get', 'mag'], 1, 5, 6, 50]
+                            ],
+                            // Color circle by Lightning Intensity
+                            'circle-color': [
+                                'interpolate',
+                                ['linear'],
+                                ['get', 'mag'],
+                                1,
+                                'rgba(33,102,172,0)',
+                                2,
+                                'rgb(103,169,207)',
+                                3,
+                                'rgb(209,229,240)',
+                                4,
+                                'rgb(253,219,199)',
+                                5,
+                                'rgb(239,138,98)',
+                                6,
+                                'rgb(178,24,43)'
+                            ],
+                            'circle-stroke-color': 'white',
+                            'circle-stroke-width': 1,
+                            // Transition from heatmap to circle layer by zoom level
+                            'circle-opacity': [
+                                'interpolate',
+                                ['linear'],
+                                ['zoom'],
+                                7,
+                                0,
+                                8,
+                                1
+                            ]
+                        }
+
+                    });
+
+
+
+
+            });
+
+            // Toggle Functionality
+            var layerToggle = document.getElementById('layerToggle');
+            var layerToggle1 = document.getElementById('layerToggle1');
+            var layerToggle2 = document.getElementById('layerToggle2');
+            var layerToggle3 = document.getElementById('layerToggle3');
+
+
+            var point_Id = 'lightning';
+            var raster_Id = 'raster-layer';
+            var forest_Id = 'raster-layer-forest'
+            var cape_Id = 'point1'
+
+
+
+
+            layerToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    map.setLayoutProperty(point_Id, 'visibility', 'visible');
+                } else {
+                    map.setLayoutProperty(point_Id, 'visibility', 'none');
+                }
+            });
+
+            layerToggle1.addEventListener('change', function () {
+                if (this.checked) {
+                    map.setLayoutProperty(raster_Id, 'visibility', 'visible');
+                } else {
+                    map.setLayoutProperty(raster_Id, 'visibility', 'none');
+                }
+            });
+
+            layerToggle2.addEventListener('change', function () {
+                if (this.checked) {
+                    map.setLayoutProperty(forest_Id, 'visibility', 'visible');
+                } else {
+                    map.setLayoutProperty(forest_Id, 'visibility', 'none');
+                }
+            });
+
+            layerToggle3.addEventListener('change', function () {
+                if (this.checked) {
+                    map.setLayoutProperty(cape_Id, 'visibility', 'visible');
+                } else {
+                    map.setLayoutProperty(cape_Id, 'visibility', 'none');
+                }
+            });
+
+
+            // Popup Functionality
+            map.on('click', 'lightning-point', function (e) {
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML('<h3>' + "Lightning Intensity J/KG" + '</h3><p>' + e.features[0].properties.capevalue + '</p>')
+                    .addTo(map);
+            });
+
+            map.on('click', 'point1', function (e) {
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML('<h3>' + "Potential Energy" + '</h3><p>' + e.features[0].properties.grid_code + '</p>')
+                    .addTo(map);
+            });
+
+            // Time Slider
+
+            // Set the minimum and maximum values of the slider based on the date range
+            const rangeSlider = document.getElementById('slider');
+            rangeSlider.min = '0';
+            rangeSlider.max = String('lightning'.length - 1);
+
+            // // Update the date label to display the selected date
+            // const dateLabel = document.getElementById('month');
+            // dateLabel.textContent = uniqueDates[rangeSlider.value];
+
+            // Event listener for slider input changes
+            rangeSlider.addEventListener('input', function () {
+                //const selectedDate = uniqueDates[this.value];
+                // dateLabel.textContent = selectedDate;
+                const selectedDate = String(this.value);
+                //    dateLabel.textContent = selectedDate;
+                console.log(typeof this.value)
+                // Update the map's lightning point layer filter based on the selected date
+                map.setFilter('lightning', ['>=', ["get", "date"], selectedDate]);
+                //["to-number", ["get", "property-name"]]
+            });
+
+
+
+        });
+
+
+        map.on('error', function (err) {
+            console.log(err)
+            throw new Error("To load the map, you must replace YOUR_MAPTILER_API_KEY_HERE first, see README");
+
+        });
+    </script>
+</body>
+
+</html>

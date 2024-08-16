@@ -1,0 +1,29 @@
+{
+    "sources": {
+      "my-data": {
+        "type": "vector",
+        "url": "pmtiles://http://127.0.0.1:9000/new/Salzburg.pmtiles"
+      }
+    },
+    "layers": [
+      {
+        "id": "burnedarea",
+        "type": "fill",
+        "source": "my-data",
+        "paint": {
+          "fill-opacity": 1,
+          "fill-opacity-transition": {
+            "duration": 0
+          },
+          "fill-color": [
+            "match",
+            ["get", "landuse"],
+            "residentia", "#FF0000", 
+            "commercial", "#00FF00", 
+            "other", "#0000FF"
+          ]
+        }
+      }
+    ]
+  }
+  
